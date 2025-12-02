@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>久坐站立提醒工具</title>
+    <!-- 引入Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入Font Awesome图标 -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    
+    <!-- 自定义Tailwind配置 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#10B981',
+                        warning: '#F59E0B',
+                        danger: '#EF4444',
+                        dark: '#1F2937',
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .pulse-animation {
+                animation: pulse 1.5s infinite;
+            }
+            .scale-animation {
+                animation: scale 0.5s ease-in-out;
+            }
+            @keyframes pulse {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.6; }
+            }
+            @keyframes scale {
+                0% { transform: scale(1); }
+                50% { transform: scale(1.05); }
+                100% { transform: scale(1); }
+            }
+        }
+    </style>
+</head>
+<body class="font-inter bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex flex-col items-center justify-center p-4 text-dark">
+    <div class="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden transform transition-all duration-300 hover:shadow-2xl">
+        <!-- 标题区域 -->
+        <div class="bg-primary text-white p-6 text-center">
+            <h1 class="text-[clamp(1.5rem,3vw,2rem)] font-bold flex items-center justify-center gap-2">
+                <i class="fa fa-bell-o"></i> 久坐站立提醒
+            </h1>
+            <p class="mt-2 opacity-90 text-sm">关爱健康，定时活动</p>
+        </div>
+        
+        <!-- 状态显示区域 -->
+        <div id="status-container" class="p-8 text-center">
+            <div id="status-text" class="text-lg font-medium text-gray-600 mb-2">准备就绪</div>
+            <div id="timer-display" class="text-[clamp(2.5rem,8vw,4rem)] font-bold text-primary my-4">
+                00:00
+            </div>
+            <div id="phase-indicator" class="inline-block px-4 py-1 rounded-full text-sm font-medium bg-blue-100 text-primary mb-6">
+                等待开始
+            </div>
+        </div>
+        
+        <!-- 设置区域 -->
+        <div class="px-8 pb-8">
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <label class="block text-sm font-medium text-gray-600 mb-1">工作时间 (分钟)</label>
+                    <div class="flex items-center">
+                        <button id="work-time-decrease" class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 hover:bg-gray-300 transition-colors">
+                            <i class="fa fa-minus text-gray-600"></i>
+                        </button>
+                        <input type="number" id="work-time" min="5" max="120" value="45" 
+                               class="mx-2 w-full text-center py-1 border-b border-gray-200 focus:border-primary focus:outline-none">
+                        <button id="work-time-increase" class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 hover:bg-gray-300 transition-colors">
+                            <i class="fa fa-plus text-gray-600"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <label class="block text-sm font-medium text-gray-600 mb-1">休息时间 (分钟)</label>
+                    <div class="flex items-center">
+                        <button id="break-time-decrease" class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 hover:bg-gray-300 transition-colors">
+                            <i class="fa fa-minus text-gray-600"></i>
+                        </button>
+                        <input type="number" id="break-time" min="1" max="30" value="5" 
+                               class="mx-2 w-full text-center py-1 border-b border-gray-200 focus:border-primary focus:outline-none">
+                        <button id="break-time-increase" class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 hover:bg-gray-300 transition-colors">
+                            <i class="fa fa-plus text-gray-600"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 控制按钮区域 -->
+            <div class="flex gap-3">
+                <button id="start-btn" class="flex-1 bg-primary hover:bg-primary/90 text-white font-medium py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2 scale-animation">
+                    <i class="fa fa-play"></i> 开始
+                </button>
+                <button id="pause-btn" class="flex-1 bg-warning hover:bg-warning/90 text-white font-medium py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2 scale-animation hidden">
+                    <i class="fa fa-pause"></i> 暂停
+                </button>
+                <button id="reset-btn" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2 scale-animation">
+                    <i class="fa fa-refresh"></i> 重置
+                </button>
+            </div>
+            
+            <!-- 提醒设置 -->
+            <div class="mt-4 flex items-center justify-between text-sm text-gray-600">
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" id="sound-alert" checked class="w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary">
+                    <span>声音提醒</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" id="auto-start-break" checked class="w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary">
+                    <span>自动开始休息</span>
+                </label>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 提醒弹窗 -->
+    <div id="alert-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl p-8 max-w-md w-full mx-4 transform transition-all scale-animation">
+            <div class="text-center">
+                <div id="alert-icon" class="w-16 h-16 bg-secondary/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fa fa-check text-2xl text-secondary"></i>
+                </div>
+                <h2 id="alert-title" class="text-xl font-bold mb-2">休息时间到！</h2>
+                <p id="alert-message" class="text-gray-600 mb-6">站起来活动一下身体吧～</p>
+                <button id="alert-confirm" class="w-full bg-primary hover:bg-primary/90 text-white font-medium py-3 rounded-lg transition-all">
+                    知道了
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let timerInterval;
+        let secondsLeft = 0;
+        let workMinutes = 45;
+        let breakMinutes = 5;
+        let isWorking = true;
+        let isPaused = false;
+        let soundAlertEnabled = true;
+        let autoStartBreakEnabled = true;
+        
+        // DOM 元素
+        const timerDisplay = document.getElementById('timer-display');
+        const statusText = document.getElementById('status-text');
+        const phaseIndicator = document.getElementById('phase-indicator');
+        const startBtn = document.getElementById('start-btn');
+        const pauseBtn = document.getElementById('pause-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const workTimeInput = document.getElementById('work-time');
+        const breakTimeInput = document.getElementById('break-time');
+        const workTimeDecrease = document.getElementById('work-time-decrease');
+        const workTimeIncrease = document.getElementById('work-time-increase');
+        const breakTimeDecrease = document.getElementById('break-time-decrease');
+        const breakTimeIncrease = document.getElementById('break-time-increase');
+        const soundAlertToggle = document.getElementById('sound-alert');
+        const autoStartBreakToggle = document.getElementById('auto-start-break');
+        const alertModal = document.getElementById('alert-modal');
+        const alertTitle = document.getElementById('alert-title');
+        const alertMessage = document.getElementById('alert-message');
+        const alertIcon = document.getElementById('alert-icon');
+        const alertConfirm = document.getElementById('alert-confirm');
+        
+        // 初始化
+        function init() {
+            // 设置默认值
+            workTimeInput.value = workMinutes;
+            breakTimeInput.value = breakMinutes;
+            soundAlertToggle.checked = soundAlertEnabled;
+            autoStartBreakToggle.checked = autoStartBreakEnabled;
+            
+            // 更新计时器显示
+            updateTimerDisplay(workMinutes * 60);
+            
+            // 绑定事件监听
+            bindEventListeners();
+        }
+        
+        // 绑定事件监听
+        function bindEventListeners() {
+            // 控制按钮
+            startBtn.addEventListener('click', startTimer);
+            pauseBtn.addEventListener('click', pauseTimer);
+            resetBtn.addEventListener('click', resetTimer);
+            
+            // 时间调整按钮
+            workTimeDecrease.addEventListener('click', () => adjustTime(workTimeInput, -1, 5, 120));
+            workTimeIncrease.addEventListener('click', () => adjustTime(workTimeInput, 1, 5, 120));
+            breakTimeDecrease.addEventListener('click', () => adjustTime(breakTimeInput, -1, 1, 30));
+            breakTimeIncrease.addEventListener('click', () => adjustTime(breakTimeInput, 1, 1, 30));
+            
+            // 时间输入框变化
+            workTimeInput.addEventListener('change', () => {
+                workMinutes = parseInt(workTimeInput.value) || 45;
+                workMinutes = Math.max(5, Math.min(120, workMinutes));
+                workTimeInput.value = workMinutes;
+                if (!timerInterval && !isPaused) {
+                    updateTimerDisplay(workMinutes * 60);
+                }
+            });
+            
+            breakTimeInput.addEventListener('change', () => {
+                breakMinutes = parseInt(breakTimeInput.value) || 5;
+                breakMinutes = Math.max(1, Math.min(30, breakMinutes));
+                breakTimeInput.value = breakMinutes;
+            });
+            
+            // 设置项变化
+            soundAlertToggle.addEventListener('change', () => {
+                soundAlertEnabled = soundAlertToggle.checked;
+            });
+            
+            autoStartBreakToggle.addEventListener('change', () => {
+                autoStartBreakEnabled = autoStartBreakToggle.checked;
+            });
+            
+            // 提醒弹窗确认
+            alertConfirm.addEventListener('click', () => {
+                alertModal.classList.add('hidden');
+                if (isWorking) {
+                    // 工作时间结束，开始休息
+                    startBreakTimer();
+                } else {
+                    // 休息时间结束，根据设置决定是否自动开始工作
+                    if (autoStartBreakEnabled) {
+                        startWorkTimer();
+                    } else {
+                        // 重置为准备状态
+                        resetTimer(false);
+                    }
+                }
+            });
+        }
+        
+        // 调整时间
+        function adjustTime(inputElement, delta, min, max) {
+            let value = parseInt(inputElement.value) + delta;
+            value = Math.max(min, Math.min(max, value));
+            inputElement.value = value;
+            
+            if (inputElement === workTimeInput) {
+                workMinutes = value;
+                if (!timerInterval && !isPaused) {
+                    updateTimerDisplay(workMinutes * 60);
+                }
+            } else {
+                breakMinutes = value;
+            }
+        }
+        
+        // 开始计时器
+        function startTimer() {
+            if (isPaused) {
+                // 恢复暂停的计时器
+                isPaused = false;
+            } else {
+                // 新开始的计时器
+                secondsLeft = isWorking ? workMinutes * 60 : breakMinutes * 60;
+            }
+            
+            // 更新UI状态
+            startBtn.classList.add('hidden');
+            pauseBtn.classList.remove('hidden');
+            workTimeInput.disabled = true;
+            breakTimeInput.disabled = true;
+            
+            // 开始倒计时
+            timerInterval = setInterval(updateTimer, 1000);
+            updateTimerStatus();
+        }
+        
+        // 暂停计时器
+        function pauseTimer() {
+            clearInterval(timerInterval);
+            timerInterval = null;
+            isPaused = true;
+            
+            // 更新UI状态
+            startBtn.classList.remove('hidden');
+            pauseBtn.classList.add('hidden');
+            startBtn.innerHTML = '<i class="fa fa-play"></i> 继续';
+            statusText.textContent = '已暂停';
+        }
+        
+        // 重置计时器
+        function resetTimer(showReady = true) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+            isPaused = false;
+            isWorking = true;
+            
+            // 重置UI状态
+            startBtn.classList.remove('hidden');
+            pauseBtn.classList.add('hidden');
+            startBtn.innerHTML = '<i class="fa fa-play"></i> 开始';
+            workTimeInput.disabled = false;
+            breakTimeInput.disabled = false;
+            
+            // 更新计时器显示
+            secondsLeft = workMinutes * 60;
+            updateTimerDisplay(secondsLeft);
+            
+            if (showReady) {
+                statusText.textContent = '准备就绪';
+                phaseIndicator.textContent = '等待开始';
+                phaseIndicator.className = 'inline-block px-4 py-1 rounded-full text-sm font-medium bg-blue-100 text-primary mb-6';
+            }
+        }
+        
+        // 开始工作计时器
+        function startWorkTimer() {
+            isWorking = true;
+            secondsLeft = workMinutes * 60;
+            updateTimerDisplay(secondsLeft);
+            startTimer();
+        }
+        
+        // 开始休息计时器
+        function startBreakTimer() {
+            isWorking = false;
+            secondsLeft = breakMinutes * 60;
+            updateTimerDisplay(secondsLeft);
+            startTimer();
+        }
+        
+        // 更新计时器
+        function updateTimer() {
+            if (secondsLeft > 0) {
+                secondsLeft--;
+                updateTimerDisplay(secondsLeft);
+                updateTimerStatus();
+            } else {
+                // 时间到，触发提醒
+                clearInterval(timerInterval);
+                timerInterval = null;
+                showAlert();
+            }
+        }
+        
+        // 更新计时器显示
+        function updateTimerDisplay(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+        }
+        
+        // 更新计时器状态
+        function updateTimerStatus() {
+            if (isWorking) {
+                statusText.textContent = `工作中，剩余时间`;
+                phaseIndicator.textContent = '工作时段';
+                phaseIndicator.className = 'inline-block px-4 py-1 rounded-full text-sm font-medium bg-blue-100 text-primary mb-6';
+                
+                // 最后5分钟添加警告样式
+                if (secondsLeft <= 5 * 60) {
+                    timerDisplay.classList.add('text-warning');
+                    phaseIndicator.className = 'inline-block px-4 py-1 rounded-full text-sm font-medium bg-yellow-100 text-warning mb-6 pulse-animation';
+                } else {
+                    timerDisplay.classList.remove('text-warning', 'text-danger');
+                }
+            } else {
+                statusText.textContent = `休息中，剩余时间`;
+                phaseIndicator.textContent = '休息时段';
+                phaseIndicator.className = 'inline-block px-4 py-1 rounded-full text-sm font-medium bg-green-100 text-secondary mb-6';
+                timerDisplay.classList.remove('text-warning', 'text-danger');
+            }
+            
+            // 最后10秒添加紧急样式
+            if (secondsLeft <= 10) {
+                timerDisplay.classList.remove('text-warning');
+                timerDisplay.classList.add('text-danger', 'pulse-animation');
+            }
+        }
+        
+        // 显示提醒
+        function showAlert() {
+            if (isWorking) {
+                alertTitle.textContent = '工作时间结束！';
+                alertMessage.textContent = `已经工作了${workMinutes}分钟，站起来活动一下身体吧～`;
+                alertIcon.className = 'w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4';
+                alertIcon.innerHTML = '<i class="fa fa-coffee text-2xl text-green-600"></i>';
+            } else {
+                alertTitle.textContent = '休息时间结束！';
+                alertMessage.textContent = `休息了${breakMinutes}分钟，准备开始新的工作时段吧～`;
+                alertIcon.className = 'w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4';
+                alertIcon.innerHTML = '<i class="fa fa-briefcase text-2xl text-primary"></i>';
+            }
+            
+            // 显示弹窗
+            alertModal.classList.remove('hidden');
+            
+            // 播放提示音
+            if (soundAlertEnabled) {
+                playAlertSound();
+            }
+        }
+        
+        // 播放提示音
+        function playAlertSound() {
+            // 创建音频上下文
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            const audioCtx = new AudioContext();
+            
+            // 创建 oscillator
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            // 连接节点
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            // 设置音频参数
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 1);
+            
+            // 设置音量渐变
+            gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.5, audioCtx.currentTime + 0.1);
+            gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 1);
+            
+            // 播放并设置停止时间
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 1);
+            
+            // 重复播放3次
+            setTimeout(() => playAlertSound(), 1200);
+            setTimeout(() => playAlertSound(), 2400);
+        }
+        
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
